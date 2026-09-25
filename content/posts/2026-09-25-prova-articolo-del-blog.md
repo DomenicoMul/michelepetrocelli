@@ -7,7 +7,7 @@ Primo articolo
 
 # **Pillo(w)la n. 25 – Governance Anticipatoria e Strategic Foresight**
 
-![](/images/PILLOWLA25-1.png)
+![](/public/images/PILLOWLA25-1.png)
 
 Nella ++[Pillo(w)la precedente](https://www.michelepetrocelli.it/pillowla-n-24-intelligenza-artificiale-e-digital-transformation/)++ abbiamo parlato dell’importanza di trasformare i dati in conoscenza attraverso l’utilizzo dell’Intelligenza Artificiale. Aggiungiamo, adesso, un altro tassello per la costruzione del nostro modello strategico operativo: utilizzare tale conoscenza per orientare le scelte del presente verso futuri desiderabili.
 
