@@ -110,29 +110,53 @@
       margin-top: auto;
     }
 
-    .error-msg {
+    .status-msg {
       text-align: center;
-      color: #dc3545;
+      color: #666;
       grid-column: 1 / -1;
-      padding: 20px;
+      padding: 40px;
+      font-size: 1.1rem;
     }
   </style>
 </head>
 <body>
 
   <h1>Articoli del Blog</h1>
-  <div class="posts-grid" id="postsContainer"></div>
+  <div class="posts-grid" id="postsContainer">
+    <div class="status-msg">Caricamento dinamico degli articoli...</div>
+  </div>
 
   <script>
-    // Nomi dei file presenti nella cartella content/posts/
-    const postFiles = [
-      '2026-09-25-prova-articolo-del-blog.md',
-      '2026-09-25-test.md'
-    ];
+    // Dettagli repository GitHub
+    const REPO_OWNER = "DomenicoMul";
+    const REPO_NAME = "michelepetrocelli";
+    const POSTS_PATH = "content/posts";
 
     const postsContainer = document.getElementById('postsContainer');
 
-    // Funzione per estrarre Front Matter YAML
+    // 1. LETTURA DINAMICA DEI FILE .MD VIA GITHUB API
+    async function fetchPostFileList() {
+      const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${POSTS_PATH}`;
+      
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`Impossibile leggere la cartella (Status: ${response.status})`);
+        }
+        
+        const files = await response.json();
+        
+        // Estrae solo i file che terminano con .md
+        return files
+          .filter(file => file.type === 'file' && file.name.endsWith('.md'))
+          .map(file => file.name);
+      } catch (error) {
+        console.error("Errore durante il recupero dinamico dei file:", error);
+        return [];
+      }
+    }
+
+    // 2. PARSING FRONT MATTER (YAML)
     function parseFrontMatter(text) {
       const frontMatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
       const match = text.match(frontMatterRegex);
@@ -150,88 +174,90 @@
       return { metadata: {}, body: text };
     }
 
-    // Funzione per estrarre la prima immagine dal testo del post
+    // 3. CORREZIONE PERCORSI IMMAGINI (da /images/ o public/images/)
+    function fixImagePath(rawPath) {
+      if (!rawPath) return 'https://via.placeholder.com/600x400?text=Nessuna+Immagine';
+      
+      // Se è un link assoluto web (http/https)
+      if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+        return rawPath;
+      }
+
+      // Rimuove la barra iniziale se c'è
+      let clean = rawPath.replace(/^\//, '');
+
+      // Se punta a images/... la trasforma in public/images/...
+      if (clean.startsWith('images/')) {
+        clean = 'public/' + clean;
+      } else if (!clean.startsWith('public/')) {
+        clean = 'public/images/' + clean;
+      }
+
+      return clean;
+    }
+
+    // Estrattore della prima immagine dal testo
     function extractFirstImage(markdownBody) {
-      // 1. Cerca sintassi Markdown ![alt](url)
+      // Sintassi Markdown: ![alt](url)
       const mdImageMatch = markdownBody.match(/!\[.*?\]\((.*?)\)/);
       if (mdImageMatch && mdImageMatch[1]) {
-        return mdImageMatch[1];
+        return fixImagePath(mdImageMatch[1]);
       }
 
-      // 2. Cerca tag HTML <img>
+      // Sintassi HTML: <img src="url">
       const htmlImageMatch = markdownBody.match(/<img[^>]+src=["']([^"']+)["']/i);
       if (htmlImageMatch && htmlImageMatch[1]) {
-        return htmlImageMatch[1];
+        return fixImagePath(htmlImageMatch[1]);
       }
 
-      // Immagine di default se non trova niente
       return 'https://via.placeholder.com/600x400?text=Nessuna+Immagine';
     }
 
-    // Prova diversi percorsi relativi per recuperare il file .md
-    async function fetchMarkdownFile(filename) {
-      const pathsToTry = [
-        `content/posts/${filename}`,
-        `./content/posts/${filename}`,
-        `/content/posts/${filename}`
-      ];
-
-      for (const path of pathsToTry) {
-        try {
-          const res = await fetch(path);
-          if (res.ok) {
-            return await res.text();
-          }
-        } catch (e) {
-          console.warn(`Tentativo fallito per ${path}:`, e);
-        }
-      }
-      return null;
-    }
-
+    // 4. CARICAMENTO E RENDERING FINALE
     async function fetchAndRenderPosts() {
-      let loadedCount = 0;
+      // Ottiene la lista dinamica dei file .md direttamente da GitHub
+      const postFiles = await fetchPostFileList();
+
+      if (postFiles.length === 0) {
+        postsContainer.innerHTML = `<div class="status-msg">Nessun articolo trovato nella cartella <code>${POSTS_PATH}</code>.</div>`;
+        return;
+      }
+
+      postsContainer.innerHTML = ''; // Pulisce il messaggio di caricamento
 
       for (const file of postFiles) {
-        const rawText = await fetchMarkdownFile(file);
+        try {
+          const filePath = `${POSTS_PATH}/${file}`;
+          const response = await fetch(filePath);
+          if (!response.ok) continue;
 
-        if (!rawText) {
-          console.error(`Impossibile trovare o caricare: ${file}`);
-          continue;
+          const rawText = await response.text();
+          const { metadata, body } = parseFrontMatter(rawText);
+
+          const title = metadata.title || file.replace('.md', '');
+          const category = metadata.category || 'Articolo';
+          const date = metadata.date ? new Date(metadata.date).toLocaleDateString('it-IT') : '';
+          const image = extractFirstImage(body);
+
+          const card = document.createElement('article');
+          card.className = 'post-card';
+          card.innerHTML = `
+            <a href="${filePath}" class="post-image-wrapper">
+              <img src="${image}" alt="${title}" loading="lazy" onerror="this.src='https://via.placeholder.com/600x400?text=Immagine+Non+Trovata'">
+            </a>
+            <div class="post-content">
+              <span class="post-category">${category}</span>
+              <h2 class="post-title">
+                <a href="${filePath}">${title}</a>
+              </h2>
+              ${date ? `<span class="post-date">${date}</span>` : ''}
+            </div>
+          `;
+
+          postsContainer.appendChild(card);
+        } catch (error) {
+          console.error(`Errore nel caricamento del post ${file}:`, error);
         }
-
-        loadedCount++;
-        const { metadata, body } = parseFrontMatter(rawText);
-
-        const title = metadata.title || file.replace('.md', '');
-        const category = metadata.category || 'Articolo';
-        const date = metadata.date ? new Date(metadata.date).toLocaleDateString('it-IT') : '';
-        const image = extractFirstImage(body);
-
-        // Collegamento al file MD o HTML corrispondente
-        const postUrl = `content/posts/${file}`;
-
-        const card = document.createElement('article');
-        card.className = 'post-card';
-        card.innerHTML = `
-          <a href="${postUrl}" class="post-image-wrapper">
-            <img src="./${image}" alt="${title}" loading="lazy">
-          </a>
-          <div class="post-content">
-            <span class="post-category">${category}</span>
-            <h2 class="post-title">
-              <a href="${postUrl}">${title}</a>
-            </h2>
-            ${date ? `<span class="post-date">${date}</span>` : ''}
-            <p>${image}</p>
-          </div>
-        `;
-
-        postsContainer.appendChild(card);
-      }
-
-      if (loadedCount === 0) {
-        postsContainer.innerHTML = `<p class="error-msg">Nessun articolo trovato. Verificare che i file siano presenti in <code>content/posts/</code>.</p>`;
       }
     }
 
