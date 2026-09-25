@@ -96,7 +96,7 @@
     async function loadPosts() {
       for (const file of postFiles) {
         try {
-          const response = await fetch(`content/post/${file}`);
+          const response = await fetch(`content/posts/${file}`);
           if (!response.ok) continue;
 
           const text = await response.text();
