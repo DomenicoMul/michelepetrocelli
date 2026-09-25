@@ -54,7 +54,6 @@
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
     }
 
-    /* Wrapper per l'immagine con rapporto fisso */
     .post-image-wrapper {
       width: 100%;
       height: 200px;
@@ -74,7 +73,6 @@
       transform: scale(1.05);
     }
 
-    /* Dettagli del Post */
     .post-content {
       padding: 20px;
       display: flex;
@@ -111,6 +109,13 @@
       color: #6c757d;
       margin-top: auto;
     }
+
+    .error-msg {
+      text-align: center;
+      color: #dc3545;
+      grid-column: 1 / -1;
+      padding: 20px;
+    }
   </style>
 </head>
 <body>
@@ -119,8 +124,7 @@
   <div class="posts-grid" id="postsContainer"></div>
 
   <script>
-    // 1. Inserisci qui l'elenco dei nomi file presenti in /content/posts/
-    // Se usi uno script di build (Node/Hugo/Gulp), questo array può essere generato automaticamente.
+    // Nomi dei file presenti nella cartella content/posts/
     const postFiles = [
       '2026-09-25-prova-articolo-del-blog.md',
       '2026-09-25-test.md'
@@ -128,79 +132,105 @@
 
     const postsContainer = document.getElementById('postsContainer');
 
-    // Funzione per separare Front Matter (YAML) e Body del Markdown
+    // Funzione per estrarre Front Matter YAML
     function parseFrontMatter(text) {
       const frontMatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
       const match = text.match(frontMatterRegex);
 
       if (match) {
-        const yamlText = match[1];
-        const body = match[2];
-        const data = jsyaml.load(yamlText); // Converte lo YAML in oggetto JS
-        return { metadata: data, body: body };
+        try {
+          const yamlText = match[1];
+          const body = match[2];
+          const data = jsyaml.load(yamlText);
+          return { metadata: data || {}, body: body };
+        } catch (e) {
+          console.error("Errore parsing YAML:", e);
+        }
       }
-
       return { metadata: {}, body: text };
     }
 
-    // Funzione per estrarre la prima immagine dal testo Markdown o HTML
+    // Funzione per estrarre la prima immagine dal testo del post
     function extractFirstImage(markdownBody) {
-      // Cerca la prima sintassi Markdown per immagini: ![alt](url)
+      // 1. Cerca sintassi Markdown ![alt](url)
       const mdImageMatch = markdownBody.match(/!\[.*?\]\((.*?)\)/);
       if (mdImageMatch && mdImageMatch[1]) {
         return mdImageMatch[1];
       }
 
-      // Cerca eventuale tag HTML <img> inserito nel body
+      // 2. Cerca tag HTML <img>
       const htmlImageMatch = markdownBody.match(/<img[^>]+src=["']([^"']+)["']/i);
       if (htmlImageMatch && htmlImageMatch[1]) {
         return htmlImageMatch[1];
       }
 
-      // Immagine di fallback se nel testo non ne è presente nessuna
+      // Immagine di default se non trova niente
       return 'https://via.placeholder.com/600x400?text=Nessuna+Immagine';
     }
 
-    // Caricamento ed elaborazione dei file .md
-    async function fetchAndRenderPosts() {
-      for (const file of postFiles) {
+    // Prova diversi percorsi relativi per recuperare il file .md
+    async function fetchMarkdownFile(filename) {
+      const pathsToTry = [
+        `content/posts/${filename}`,
+        `./content/posts/${filename}`,
+        `/content/posts/${filename}`
+      ];
+
+      for (const path of pathsToTry) {
         try {
-          // Percorso configurato: /content/posts/
-          const response = await fetch(`/content/posts/${file}`);
-          if (!response.ok) continue;
-
-          const rawText = await response.text();
-          const { metadata, body } = parseFrontMatter(rawText);
-
-          // Estrazione dati
-          const title = metadata.title || file.replace('.md', '');
-          const category = metadata.category || 'Generale';
-          const date = metadata.date ? new Date(metadata.date).toLocaleDateString('it-IT') : '';
-          const image = extractFirstImage(body);
-
-          // URL di destinazione della pagina del post
-          const postUrl = `/content/posts/${file.replace('.md', '.html')}`;
-
-          // Creazione della Card HTML
-          const card = document.createElement('article');
-          card.className = 'post-card';
-          card.innerHTML = `
-            <a href="${postUrl}" class="post-image-wrapper">
-              <img src="${image}" alt="${title}" loading="lazy">
-            </a>
-            <div class="post-content">
-              <span class="post-category">${category}</span>
-              <h2 class="post-title">
-                <a href="${postUrl}">${title}</a>
-              </h2>
-              ${date ? `<span class="post-date">${date}</span>` : ''}
-            </div>
-          `;
-
-          postsContainer.appendChild(card);
-        } catch (error) {
-          console.error(`Errore durante il caricamento di ${file}:`, error);
+          const res = await fetch(path);
+          if (res.ok) {
+            return await res.text();
+          }
+        } catch (e) {
+          console.warn(`Tentativo fallito per ${path}:`, e);
         }
+      }
+      return null;
+    }
+
+    async function fetchAndRenderPosts() {
+      let loadedCount = 0;
+
+      for (const file of postFiles) {
+        const rawText = await fetchMarkdownFile(file);
+
+        if (!rawText) {
+          console.error(`Impossibile trovare o caricare: ${file}`);
+          continue;
+        }
+
+        loadedCount++;
+        const { metadata, body } = parseFrontMatter(rawText);
+
+        const title = metadata.title || file.replace('.md', '');
+        const category = metadata.category || 'Articolo';
+        const date = metadata.date ? new Date(metadata.date).toLocaleDateString('it-IT') : '';
+        const image = extractFirstImage(body);
+
+        // Collegamento al file MD o HTML corrispondente
+        const postUrl = `content/posts/${file}`;
+
+        const card = document.createElement('article');
+        card.className = 'post-card';
+        card.innerHTML = `
+          <a href="${postUrl}" class="post-image-wrapper">
+            <img src="${image}" alt="${title}" loading="lazy">
+          </a>
+          <div class="post-content">
+            <span class="post-category">${category}</span>
+            <h2 class="post-title">
+              <a href="${postUrl}">${title}</a>
+            </h2>
+            ${date ? `<span class="post-date">${date}</span>` : ''}
+          </div>
+        `;
+
+        postsContainer.appendChild(card);
+      }
+
+      if (loadedCount === 0) {
+        postsContainer.innerHTML = `<p class="error-msg">Nessun articolo trovato. Verificare che i file siano presenti in <code>content/posts/</code>.</p>`;
       }
     }
 
