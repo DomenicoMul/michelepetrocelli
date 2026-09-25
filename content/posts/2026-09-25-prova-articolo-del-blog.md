@@ -7,7 +7,7 @@ Primo articolo
 
 # **Pillo(w)la n. 25 – Governance Anticipatoria e Strategic Foresight**
 
-![](/images/PILLOWLA25-1.png)
+![](/public/images/PILLOWLA25-1.png)
 
 
 
