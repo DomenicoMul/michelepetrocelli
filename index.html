@@ -4,9 +4,68 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Il mio Sito Web</title>
+  <!-- Libreria gratuita per convertire Markdown in HTML -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .post { border-bottom: 1px solid #ccc; padding-bottom: 20px; margin-bottom: 20px; }
+    .badge { background: #007bff; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; }
+  </style>
 </head>
 <body>
-  <h1>Benvenuto nel mio sito personale</h1>
-  <p>Questo sito è gestito tramite Pages CMS e ospitato su GitHub Pages.</p>
+
+  <h1>Il mio Sito Web</h1>
+  <div id="blog-posts">Caricamento articoli...</div>
+
+  <script>
+    // Sostituisci col tuo username GitHub
+    const username = "michelepetrocelli"; 
+    const repo = "michelepetrocelli"; // o il nome preciso del tuo repo
+
+    async function loadPosts() {
+      const container = document.getElementById('blog-posts');
+      try {
+        // 1. Chiede a GitHub l'elenco dei file nella cartella dei post
+        const res = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/content/posts`);
+        if (!res.ok) throw new Error("Nessun articolo trovato.");
+        
+        const files = await res.json();
+        container.innerHTML = '';
+
+        // 2. Legge ogni file Markdown inserito da Pages CMS
+        for (const file of files) {
+          if (file.name.endsWith('.md')) {
+            const rawRes = await fetch(file.download_url);
+            const text = await rawRes.text();
+            
+            // Separa i metadati (titolo, categoria) dal testo
+            const parts = text.split('---');
+            const frontmatter = parts[1] || '';
+            const content = parts.slice(2).join('---') || text;
+
+            // Estrae Titolo e Categoria
+            const titleMatch = frontmatter.match(/title:\s*(.*)/);
+            const categoryMatch = frontmatter.match(/category:\s*(.*)/);
+            
+            const title = titleMatch ? titleMatch[1] : file.name;
+            const category = categoryMatch ? categoryMatch[1] : 'Generale';
+
+            // Crea l'HTML dell'articolo
+            const postElement = document.createElement('article');
+            postElement.className = 'post';
+            postElement.innerHTML = `
+              <h2>${title} <span class="badge">${category}</span></h2>
+              <div>${marked.parse(content)}</div>
+            `;
+            container.appendChild(postElement);
+          }
+        }
+      } catch (err) {
+        container.innerHTML = '<p>Non ci sono ancora articoli pubblicati.</p>';
+      }
+    }
+
+    loadPosts();
+  </script>
 </body>
 </html>
