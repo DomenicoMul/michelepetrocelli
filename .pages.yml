@@ -2,12 +2,11 @@ media:
   input: public/images
   output: /images
 
-collections:
+content:
   - name: articoli
     label: Articoli del Blog
+    type: collection
     path: content/posts
-    type: folder
-    format: md
     fields:
       - name: title
         label: Titolo dell'articolo
@@ -17,10 +16,11 @@ collections:
         label: Categoria
         type: select
         options:
-          - Tecnologie
-          - Viaggi
-          - Vita Personale
-          - Tutorial
+          values:
+            - Tecnologie
+            - Viaggi
+            - Vita Personale
+            - Tutorial
         required: true
       - name: date
         label: Data
