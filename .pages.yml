@@ -1,0 +1,31 @@
+media:
+  input: public/images
+  output: /images
+
+collections:
+  - name: articoli
+    label: Articoli del Blog
+    path: content/posts
+    type: folder
+    format: md
+    fields:
+      - name: title
+        label: Titolo dell'articolo
+        type: string
+        required: true
+      - name: category
+        label: Categoria
+        type: select
+        options:
+          - Tecnologie
+          - Viaggi
+          - Vita Personale
+          - Tutorial
+        required: true
+      - name: date
+        label: Data
+        type: date
+        required: true
+      - name: body
+        label: Contenuto dell'articolo
+        type: rich-text
