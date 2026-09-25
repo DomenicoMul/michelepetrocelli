@@ -3,125 +3,208 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Elenco Post</title>
+  <title>Blog - Articoli</title>
+  
+  <!-- Librerie per il parsing di Markdown e Front Matter YAML -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f4f9;
+    * {
+      box-sizing: border-box;
       margin: 0;
-      padding: 20px;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f8f9fa;
+      color: #333;
+      padding: 40px 20px;
     }
 
     h1 {
       text-align: center;
-      color: #333;
+      margin-bottom: 30px;
+      font-size: 2rem;
     }
 
     /* Griglia a colonne reattiva */
     .posts-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
+      gap: 24px;
       max-width: 1200px;
-      margin: 30px auto;
+      margin: 0 auto;
     }
 
-    /* Scheda del post */
+    /* Card del Post */
     .post-card {
       background: #ffffff;
-      border-radius: 8px;
+      border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       display: flex;
       flex-direction: column;
     }
 
     .post-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+      transform: translateY(-4px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
     }
 
-    .post-card img {
+    /* Wrapper per l'immagine con rapporto fisso */
+    .post-image-wrapper {
       width: 100%;
       height: 200px;
+      overflow: hidden;
+      background-color: #e9ecef;
+      display: block;
+    }
+
+    .post-image-wrapper img {
+      width: 100%;
+      height: 100%;
       object-fit: cover;
-      cursor: pointer;
+      transition: transform 0.3s ease;
     }
 
-    .post-card h2 {
-      font-size: 1.1rem;
-      margin: 15px;
-      color: #222;
-      text-align: center;
+    .post-card:hover .post-image-wrapper img {
+      transform: scale(1.05);
     }
 
-    .post-card a {
+    /* Dettagli del Post */
+    .post-content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .post-category {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #0066cc;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .post-title {
+      font-size: 1.2rem;
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
+
+    .post-title a {
       text-decoration: none;
-      color: inherit;
+      color: #1a1a1a;
+    }
+
+    .post-title a:hover {
+      color: #0066cc;
+    }
+
+    .post-date {
+      font-size: 0.85rem;
+      color: #6c757d;
+      margin-top: auto;
     }
   </style>
 </head>
 <body>
 
-  <h1>Tutti i Post</h1>
+  <h1>Articoli del Blog</h1>
   <div class="posts-grid" id="postsContainer"></div>
 
   <script>
-    // Elenco dei file markdown presenti in content/post/
-    // (In un ambiente reale, questo array può essere generato automaticamente da uno script o letto da un posts.json)
+    // 1. Inserisci qui l'elenco dei nomi file presenti in /content/posts/
+    // Se usi uno script di build (Node/Hugo/Gulp), questo array può essere generato automaticamente.
     const postFiles = [
-      '2026-09-25-prova-articolo-del-blog.md',
-      '2026-09-25-test.md'
+      'primo-articolo.md',
+      'il-mio-viaggio.md'
     ];
 
     const postsContainer = document.getElementById('postsContainer');
 
-    // Funzione per estrarre Titolo e Immagine dal contenuto Markdown / Front Matter
-    function parseMarkdown(mdText, filename) {
-      // Estrae il titolo (es. # Titolo oppure title: "Titolo")
-      const titleMatch = mdText.match(/^title:\s*["']?(.*?)["']?$/m) \vert{}\vert{} mdText.match(/^#\s+(.*)$/m);
-      const title = titleMatch ? titleMatch[1] : filename.replace('.md', '');
+    // Funzione per separare Front Matter (YAML) e Body del Markdown
+    function parseFrontMatter(text) {
+      const frontMatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
+      const match = text.match(frontMatterRegex);
 
-      // Estrae l'immagine (es. image: "/path/img.jpg" oppure ![alt](url))
-      const imageMatch = mdText.match(/^image:\s*["']?(.*?)["']?$/m) || mdText.match(/!\[.*?\]\((.*?)\)/);
-      const image = imageMatch ? imageMatch[1] : 'https://via.placeholder.com/300x200?text=No+Image';
+      if (match) {
+        const yamlText = match[1];
+        const body = match[2];
+        const data = jsyaml.load(yamlText); // Converte lo YAML in oggetto JS
+        return { metadata: data, body: body };
+      }
 
-      // Genera il link alla pagina del post (sostituendo .md con .html o usando la rotte del tuo sito)
-      const postUrl = `content/post/${filename.replace('.md', '.html')}`;
-
-      return { title, image, postUrl };
+      return { metadata: {}, body: text };
     }
 
-    async function loadPosts() {
+    // Funzione per estrarre la prima immagine dal testo Markdown o HTML
+    function extractFirstImage(markdownBody) {
+      // Cerca la prima sintassi Markdown per immagini: ![alt](url)
+      const mdImageMatch = markdownBody.match(/!\[.*?\]\((.*?)\)/);
+      if (mdImageMatch && mdImageMatch[1]) {
+        return mdImageMatch[1];
+      }
+
+      // Cerca eventuale tag HTML <img> inserito nel body
+      const htmlImageMatch = markdownBody.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (htmlImageMatch && htmlImageMatch[1]) {
+        return htmlImageMatch[1];
+      }
+
+      // Immagine di fallback se nel testo non ne è presente nessuna
+      return 'https://via.placeholder.com/600x400?text=Nessuna+Immagine';
+    }
+
+    // Caricamento ed elaborazione dei file .md
+    async function fetchAndRenderPosts() {
       for (const file of postFiles) {
         try {
-          const response = await fetch(`content/posts/${file}`);
+          // Percorso configurato: /content/posts/
+          const response = await fetch(`/content/posts/${file}`);
           if (!response.ok) continue;
 
-          const text = await response.text();
-          const { title, image, postUrl } = parseMarkdown(text, file);
+          const rawText = await response.text();
+          const { metadata, body } = parseFrontMatter(rawText);
 
-          // Creazione dell'elemento HTML per la colonna/card
-          const card = document.createElement('div');
+          // Estrazione dati
+          const title = metadata.title || file.replace('.md', '');
+          const category = metadata.category || 'Generale';
+          const date = metadata.date ? new Date(metadata.date).toLocaleDateString('it-IT') : '';
+          const image = extractFirstImage(body);
+
+          // URL di destinazione della pagina del post
+          const postUrl = `/content/posts/${file.replace('.md', '.html')}`;
+
+          // Creazione della Card HTML
+          const card = document.createElement('article');
           card.className = 'post-card';
           card.innerHTML = `
-            <a href="${postUrl}">
+            <a href="${postUrl}" class="post-image-wrapper">
               <img src="${image}" alt="${title}" loading="lazy">
             </a>
-            <h2>
-              <a href="${postUrl}">${title}</a>
-            </h2>
+            <div class="post-content">
+              <span class="post-category">${category}</span>
+              <h2 class="post-title">
+                <a href="${postUrl}">${title}</a>
+              </h2>
+              ${date ? `<span class="post-date">${date}</span>` : ''}
+            </div>
           `;
 
           postsContainer.appendChild(card);
         } catch (error) {
-          console.error(`Errore nel caricamento del file ${file}:`, error);
+          console.error(`Errore durante il caricamento di ${file}:`, error);
         }
       }
     }
 
-    loadPosts();
+    fetchAndRenderPosts();
   </script>
 </body>
 </html>
