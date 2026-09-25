@@ -1,6 +1,6 @@
 media:
   input: public/images
-  output: public/imagess
+  output: public/images
 
 content:
   - name: articoli
